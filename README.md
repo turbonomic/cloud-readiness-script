@@ -11,9 +11,9 @@ and all URLs will be written to csv files for review.
 
 -z, --azure                   Check Azure URLs
 
--p, --proxy          Specify proxy server with port
+-p, --proxy                   Specify proxy server with port
 
--U, --proxy-user     Specify proxy server user and password
+-U, --proxy-user              Specify proxy server user and password
 
 --awsfile <filename>          Specify different csv output file for AWS (default aws_checked_urls.csv)
   
