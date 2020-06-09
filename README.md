@@ -5,11 +5,15 @@ will not only check access to the URL, but also checks who issued the certificat
 and all URLs will be written to csv files for review.
 
 
-#### Usage: ./cloud_readiness_script.sh -a | -z [--awsfile <filename>] [--azurefile <filename>]
+#### Usage: ./cloud_readiness_script.sh -a | -z [--proxy <IP or Hostname:port>] [--proxy-user <username>:<password>] [--awsfile <filename>] [--azurefile <filename>]
 ```
 -a, --aws                     Check AWS URLs
 
 -z, --azure                   Check Azure URLs
+
+-p, --proxy          Specify proxy server with port
+
+-U, --proxy-user     Specify proxy server user and password
 
 --awsfile <filename>          Specify different csv output file for AWS (default aws_checked_urls.csv)
   

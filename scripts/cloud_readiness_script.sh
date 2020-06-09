@@ -1,11 +1,12 @@
 #!/bin/bash
-#version 1.0.1
+#version 1.1.0
 
 #Set initial variables
 aws_output_file="aws_checked_urls.csv"
 azure_output_file="azure_checked_urls.csv"
-usage="usage: $0 -a | -z [--awsfile <filename>] [--azurefile <filename>]"
+usage="Usage: $0 -a | -z [--proxy <IP or Hostname:port>] [--proxy-user <username>:<password>] [--awsfile <filename>] [--azurefile <filename>]"
 check_urls=0
+curl_cmd="curl -svi"
 
 #List of Amazon Regions
 declare -a AWS_regions_list=("us-east-2" "us-east-1" "us-west-1" "us-west-2" "af-south-1" "ap-east-1" "ap-south-1" "ap-northeast-3" "ap-northeast-2" #
@@ -24,7 +25,8 @@ declare -a single__AWS_urls=("api.pricing.us-east-1.amazonaws.com" "iam.amazonaw
 #List of One off Azure web sites
 declare -a single__azure_urls=("ratecard.azure-api.net" "management.core.windows.net" "management.azure.com" "login.microsoftonline.com")
 
-
+ValidIpAddressRegex="^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]):[0-9]{1,5}$";
+ValidHostnameRegex="^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]):[0-9]{1,5}$";
 
 #Function to cycle through AWS required URLs and Regions
 run_aws () {
@@ -32,7 +34,7 @@ run_aws () {
     do 
         for site in "${AWS_url_list[@]}"
         do
-            result=`curl -svi -X GET "https://${site/replace/$region}" 2>&1 |sed -e '/resolve/b' -e '/issuer/b' -e '/Failed/b' -e d |sed -e 's/^[* ]*//'`
+            result=`${curl_cmd} "https://${site/replace/$region}" 2>&1 |sed -e '/resolve/b' -e '/issuer/b' -e '/Failed/b' -e d |sed -e 's/^[* ]*//'`
             if [[ $result != *"issuer"* ]]; then 
               echo "${site/replace/$region}, $result"
             fi
@@ -45,7 +47,7 @@ run_aws () {
 run_aws_one_off () {
     for site in "${single__AWS_urls[@]}"
     do 
-        result=`curl -svi -X GET "https://${site}" 2>&1 |sed -e '/resolve/b' -e '/issuer/b' -e '/Failed/b' -e d |sed -e 's/^[* ]*//'`
+        result=`${curl_cmd} "https://${site}" 2>&1 |sed -e '/resolve/b' -e '/issuer/b' -e '/Failed/b' -e d |sed -e 's/^[* ]*//'`
         if [[ $result != *"issuer"* ]]; then 
           echo "${site/replace/$region}, $result"
         fi
@@ -57,7 +59,7 @@ run_aws_one_off () {
 run_azure_one_off () {
     for site in "${single__azure_urls[@]}"
     do 
-        result=`curl -svi -X GET "https://${site}" 2>&1 |sed -e '/resolve/b' -e '/issuer/b' -e '/Failed/b' -e d |sed -e 's/^[* ]*//'`
+        result=`${curl_cmd} "https://${site}" 2>&1 |sed -e '/resolve/b' -e '/issuer/b' -e '/Failed/b' -e d |sed -e 's/^[* ]*//'`
         if [[ $result != *"issuer"* ]]; then 
           echo "${site/replace/$region}, $result"
         fi
@@ -79,7 +81,7 @@ while [ "$1" != "" ]; do
                                 ;;
         -z | --azure )          check_urls=$(( $check_urls + 2 ))
                                 ;;
-        --awsfile )        if [ ! -z "$2" ] && [[ "$2" =~ ^[a-zA-Z0-9_+]{3,10}\.[a-zA-Z]{3}$ ]]; 
+        --awsfile )        if [[ ! -z "$2" ]] && [[ "$2" =~ ^[a-zA-Z0-9_+]{3,10}\.[a-zA-Z]{3}$ ]]; 
                                 then 
                                     aws_output_file="$2" 
                                 else 
@@ -87,10 +89,10 @@ while [ "$1" != "" ]; do
                                     echo "$usage"
                                     exit 1
                                 fi
-                                echo "$aws_output_file"
+                                echo "Saving AWS results to ${aws_output_file}"
                                 shift
                                 ;;
-        --azurefile )      if [ ! -z "$2" ] && [[ "$2" =~ ^[a-zA-Z0-9_+]{3,10}\.[a-zA-Z]{3}$ ]]; 
+        --azurefile )      if [[ ! -z "$2" ]] && [[ "$2" =~ ^[a-zA-Z0-9_+]{3,10}\.[a-zA-Z]{3}$ ]]; 
                                 then 
                                     azure_output_file="$2" 
                                 else 
@@ -98,15 +100,37 @@ while [ "$1" != "" ]; do
                                     echo "$usage"
                                     exit 1
                                 fi
-                                echo "$azure_output_file"
+                                echo "Saving Azure results to ${azure_output_file}"
                                 shift
-                                ;;                                
+                                ;;
+        -p | --proxy )      if [[ ! -z "$2" ]] && [[ "$2" =~ $ValidIpAddressRegex || "$2" =~ $ValidHostnameRegex ]]; 
+                                then
+                                    curl_cmd+=" -x $2"
+                                else 
+                                    echo 'Proxy Server not valid: Enter an IP or Hostname with the port separated by a colon'
+                                    echo "$usage"
+                                    exit 1
+                                fi
+                                shift
+                                ;;
+        -U | --proxy-user )      if [[ ! -z "$2" ]] && [[ "$2" =~ ^.{3,}:.{3,}$ ]]; 
+                                then
+                                    curl_cmd+=" -U $2"
+                                else 
+                                    echo 'Format of proxy username and password not valid: user <username:password>'
+                                    echo "$usage"
+                                    exit 1
+                                fi
+                                shift
+                                ;;                                    
         -h | --help )           echo "$usage"
                                 echo 'Options: '
-                                echo ' -a, --aws        Test AWS URLs'
-                                echo ' -z, --azure      Test Azurl URLs'
-                                echo ' --awsfile        Specify AWS output file'
-                                echo ' --azurefile      Specify Azure output file'
+                                echo ' -a, --aws            Test AWS URLs'
+                                echo ' -z, --azure          Test Azurl URLs'
+                                echo ' -p, --proxy          Specify proxy server with port'
+                                echo ' -U, --proxy-user     Specify proxy server user and password'
+                                echo ' --awsfile            Specify AWS output file'
+                                echo ' --azurefile          Specify Azure output file'
                                 exit
                                 ;;
         * )                     echo "$0: illegal option -- $1"
@@ -116,26 +140,37 @@ while [ "$1" != "" ]; do
     shift
 done
 
+curl_cmd+=" -X GET"
+echo $curl_cmd
+#exit
+
 #Main Execution of script
 if [ "$check_urls" -eq 1 ]
 then
-    echo -e 'Checking AWS\n'
+    echo -e 'Validating AWS URLs\n'
     echo 'URL Checked, Result' > "$aws_output_file"
     run_aws 
     run_aws_one_off 
 elif [ "$check_urls" -eq 2 ]
 then
-    echo -e 'Checking Azure\n'
+    echo -e 'Validating Azure URLs\n'
     echo 'URL Checked, Result' > "$azure_output_file"
     run_azure_one_off 
 elif [ "$check_urls" -eq 3 ]
 then
-    echo 'Checking Both'
-    echo -e '\nChecking AWS\n'
+    echo 'Validating Cloud Providers'
+    echo -e '\nValidating AWS URLs\n'
     echo 'URL Checked, Result' > "$aws_output_file"
     run_aws
     run_aws_one_off 
-    echo -e '\nChecking Azure'
+    echo -e '\nValidating Azure URLs\n'
     echo 'URL Checked, Result' > "$azure_output_file"
     run_azure_one_off
+elif [ "$check_urls" -eq 0 ]
+then
+    echo 'Please specify at least one cloud provider to check'
+    echo "$usage"
+    exit
 fi
+
+echo 'Cloud Readiness Script Completed!'
