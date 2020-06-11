@@ -17,6 +17,6 @@ and all URLs will be written to csv files for review.
 
 --awsfile <filename>          Optional: Specify different csv output file for AWS (default aws_checked_urls.csv)
   
---azurefile <filename>        Optional: Specify different csv output file for AWS (default aws_checked_urls.csv)
+--azurefile <filename>        Optional: Specify different csv output file for Azure (default azure_checked_urls.csv)
   ```
 **Note:** Some AWS URLs will fail by design as not every service exists in every AWS region
